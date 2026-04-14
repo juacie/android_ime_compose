@@ -1,0 +1,155 @@
+package com.juacie.data
+
+import android.content.Context
+import androidx.datastore.preferences.core.edit
+import com.juacie.datastore.PreferencesKeys
+import com.juacie.datastore.dataStore
+import com.juacie.keyboard.model.ImeLanguage
+import com.juacie.settings.BackgroundImage
+import com.juacie.settings.CandidateHeight
+import com.juacie.settings.KeyboardHeight
+import com.juacie.settings.ThemeColor
+import com.juacie.settings.ui.theme.FontType
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+
+class SettingsRepository(private val context: Context) {
+    val defaultSetting = DefaultSetting()
+
+    val enableDigitalFlow: Flow<Boolean> =
+        context.dataStore.data.map {
+            it[PreferencesKeys.ENABLE_Digital] ?: defaultSetting.enableDigital
+        }
+
+    suspend fun setEnableDigital(enabled: Boolean) {
+        context.dataStore.edit {
+            it[PreferencesKeys.ENABLE_Digital] = enabled
+        }
+    }
+
+    val keyboardHeightFlow = context.dataStore.data.map {
+        val stored = it[PreferencesKeys.KEYBOARD_HEIGHT] ?: defaultSetting.keyboardHeight.name
+        runCatching {
+            KeyboardHeight.valueOf(stored)
+        }.getOrDefault(defaultSetting.keyboardHeight)
+    }
+
+
+    suspend fun setKeyboardHeight(height: KeyboardHeight) {
+        context.dataStore.edit {
+            it[PreferencesKeys.KEYBOARD_HEIGHT] = height.name
+        }
+    }
+
+    val candidateHeightFlow = context.dataStore.data.map {
+        val stored = it[PreferencesKeys.CANDIDATE_HEIGHT] ?: defaultSetting.candidateHeight.name
+        runCatching {
+            CandidateHeight.valueOf(stored)
+        }.getOrDefault(defaultSetting.candidateHeight)
+    }
+
+    suspend fun setCandidateHeight(height: CandidateHeight) {
+        context.dataStore.edit {
+            it[PreferencesKeys.CANDIDATE_HEIGHT] = height.name
+        }
+    }
+
+    val themeColorFlow = context.dataStore.data.map {
+        val stored = it[PreferencesKeys.THEME_COLOR] ?: defaultSetting.themeColor.name
+        runCatching {
+            ThemeColor.valueOf(stored)
+        }.getOrDefault(defaultSetting.themeColor)
+    }
+
+    suspend fun setThemeColor(color: ThemeColor) {
+        context.dataStore.edit {
+            it[PreferencesKeys.THEME_COLOR] = color.name
+        }
+    }
+
+
+    val fontTypeFlow = context.dataStore.data.map {
+        val stored = it[PreferencesKeys.FONT_TYPE] ?: defaultSetting.fontType.name
+        runCatching {
+            FontType.valueOf(stored)
+        }.getOrDefault(defaultSetting.fontType)
+    }
+
+    suspend fun setFontType(font: FontType) {
+        context.dataStore.edit {
+            it[PreferencesKeys.FONT_TYPE] = font.name
+        }
+    }
+
+    val keyboardBackgroundImageFlow = context.dataStore.data
+        .map { prefs ->
+            val stored =
+                prefs[PreferencesKeys.KEYBOARD_BACKGROUND] ?: defaultSetting.backgroundImage.name
+            val image =
+                runCatching { BackgroundImage.valueOf(stored) }.getOrDefault(defaultSetting.backgroundImage)
+            if (image.isExpired()) BackgroundImage.fallback() else image
+        }
+        .distinctUntilChanged() // 只有實際改變時才發射
+
+    suspend fun setKeyboardBackgroundImage(image: BackgroundImage) {
+        val validImage =
+            if (image.isExpired()) BackgroundImage.fallback()
+            else image
+
+        context.dataStore.edit {
+            it[PreferencesKeys.KEYBOARD_BACKGROUND] = validImage.name
+        }
+    }
+
+    // 1. 讀取已啟用語言
+    val enabledLanguagesFlow: Flow<Set<String>> =
+        context.dataStore.data.map { prefs ->
+            val stored = prefs[PreferencesKeys.ENABLED_LANGUAGES]
+            if (stored.isNullOrEmpty()) {
+                // DataStore 還沒設定，使用 defaultSetting.defaultLanguage
+                defaultSetting.defaultLanguage.mapNotNull { it.locale }.toSet()
+            } else {
+                stored.split(",").toSet()
+            }
+        }
+
+    // 2. 更新啟用語言
+    suspend fun setEnabledLanguages(locales: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.ENABLED_LANGUAGES] = locales.joinToString(",")
+        }
+    }
+
+    // 3. 單一語言開關
+    suspend fun toggleLanguage(locale: String, enabled: Boolean) {
+        val current = enabledLanguagesFlow.first() // 讀取當前啟用語言
+        val updated = if (enabled) current + locale else current - locale
+        setEnabledLanguages(updated)
+    }
+
+    val lastUsedLanguageFlow: Flow<String?> = context.dataStore.data.map { prefs ->
+        prefs[PreferencesKeys.LAST_USED_LANGUAGE]
+    }
+
+    suspend fun setLastUsedLanguage(locale: String) {
+        context.dataStore.edit { prefs ->
+            prefs[PreferencesKeys.LAST_USED_LANGUAGE] = locale
+        }
+    }
+}
+
+data class DefaultSetting(
+    val enableDigital: Boolean = true,
+
+    val keyboardHeight: KeyboardHeight = KeyboardHeight.MEDIUM,
+    val candidateHeight: CandidateHeight = CandidateHeight.MEDIUM,
+
+    val themeColor: ThemeColor = ThemeColor.WHITE,
+    val backgroundImage: BackgroundImage = BackgroundImage.BG_BLUE,
+
+    val fontType: FontType = FontType.SYSTEM,
+
+    val defaultLanguage: List<ImeLanguage> = listOf(ImeLanguage())
+)

@@ -1,0 +1,3 @@
+include ':kika-t9-engine-library', ':kika-pinyin-engine-library'
+
+project(':kika-pinyin-engine-library').projectDir = new File('./Android_Kika_Pinyin_Engine_Library/kika-pinyin-engine-library')

@@ -1,0 +1,4 @@
+[submodule "zhuyin_v1.2_IQQI"]
+	path = Android_Kika_Pinyin_Engine_Library
+	url = git@github.com:KikaTech/Android_Kika_Pinyin_Engine_Library.git
+	branch = zhuyin_v1.2_IQQI_Android35

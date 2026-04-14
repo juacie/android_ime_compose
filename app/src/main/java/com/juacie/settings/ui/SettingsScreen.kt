@@ -1,0 +1,258 @@
+package com.juacie.settings.ui
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.juacie.data.LanguageRepository
+import com.juacie.data.SettingsRepository
+import com.juacie.ime.BuildConfig
+import com.juacie.settings.BackgroundImage
+import com.juacie.settings.CandidateHeight
+import com.juacie.settings.KeyboardHeight
+import com.juacie.settings.SettingsViewModel
+import com.juacie.settings.SettingsViewModelFactory
+import com.juacie.settings.ThemeColor
+import com.juacie.settings.ui.dialog.SettingImageSelectionDialog
+import com.juacie.settings.ui.dialog.SettingsSelectionDialog
+import com.juacie.settings.ui.item.AboutSection
+import com.juacie.settings.ui.item.SettingListItemModern
+import com.juacie.settings.ui.item.SettingSwitchItemModern
+import com.juacie.settings.ui.theme.FontType
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SettingsScreen(
+    settingRepository: SettingsRepository,
+    languageRepository: LanguageRepository,
+    onBack: () -> Unit
+) {
+
+    val viewModel: SettingsViewModel = viewModel(
+        factory = SettingsViewModelFactory(
+            settingRepository = settingRepository,
+            languageRepository = languageRepository
+        )
+    )
+
+    var showKeyboardHeightDialog by remember { mutableStateOf(false) }
+    var showCandidateHeightDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+    var showKeyboardBackgroundDialog by remember { mutableStateOf(false) }
+    var showFontDialog by remember { mutableStateOf(false) }
+
+    val enableDigital by viewModel.enableDigital.collectAsState()
+    val currentKeyboardHeight by viewModel.currentKeyboardHeight.collectAsState()
+    val currentCandidateHeight by viewModel.currentCandidateHeight.collectAsState()
+    val fontType by viewModel.fontType.collectAsState()
+
+    val themeColor by viewModel.themeColor.collectAsState()
+    val backgroundImage by viewModel.keyboardBackgroundImage.collectAsState()
+
+    KeyboardTheme(
+        themeColor = themeColor,
+        fontType = fontType,
+    ) {
+
+        Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = {
+                CenterAlignedTopAppBar(
+                    title = { Text("Keyboard Settings") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.Default.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    }
+                )
+            }
+        ) { padding ->
+
+            androidx.compose.foundation.lazy.LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                item {
+                    SettingsCategoryCard(title = "Layout") {
+
+                        SettingSwitchItemModern(
+                            title = "Show digital keyboard",
+                            summary = "Show the digital keyboard",
+                            checked = enableDigital,
+                            onCheckedChange = {
+                                viewModel.toggleDigital(it)
+                            }
+                        )
+                        HorizontalDivider()
+
+                        SettingListItemModern(
+                            title = "Keyboard Height",
+                            summary = "Adjust the overall keyboard size",
+                            currentValue = "$currentKeyboardHeight",
+                            onClick = { showKeyboardHeightDialog = true }
+                        )
+                        HorizontalDivider()
+
+                        SettingListItemModern(
+                            title = "Candidate Height",
+                            summary = "Adjust the overall candidate size",
+                            currentValue = "$currentCandidateHeight",
+                            onClick = { showCandidateHeightDialog = true }
+                        )
+                        HorizontalDivider()
+                    }
+                }
+
+                item {
+                    SettingsCategoryCard(title = "Appearance") {
+
+                        SettingListItemModern(
+                            title = "Theme Color",
+                            summary = "Change primary accent color",
+                            currentValue = themeColor.name,
+                            onClick = { showThemeDialog = true }
+                        )
+
+                        HorizontalDivider()
+
+                        SettingListItemModern(
+                            title = "Background Image",
+                            summary = "Choose keyboard background",
+                            currentValue = backgroundImage.label,
+                            onClick = { showKeyboardBackgroundDialog = true }
+                        )
+
+                        HorizontalDivider()
+
+                        SettingListItemModern(
+                            title = "Font",
+                            summary = "Change keyboard font",
+                            currentValue = fontType.label,
+                            onClick = { showFontDialog = true }
+                        )
+                        HorizontalDivider()
+                    }
+                }
+
+                if (BuildConfig.EnableLanguage) {
+                    item {
+                        SettingsCategoryCard(title = "Languages") {
+                            val languages by viewModel.availableLanguages.collectAsState()
+                            languages.forEach { lang ->
+                                SettingSwitchItemModern(
+                                    title = lang.locale ?: lang.name.name,
+                                    summary = "Enable this language",
+                                    checked = lang.enabled,
+                                    onCheckedChange = { enabled ->
+                                        viewModel.toggleLanguage(lang, enabled)
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    SettingsCategoryCard(title = "About") {
+
+                        AboutSection()
+
+                        HorizontalDivider()
+                    }
+                }
+            }
+
+            if (showKeyboardHeightDialog) {
+                SettingsSelectionDialog(
+                    title = "Keyboard Height",
+                    options = KeyboardHeight.entries,
+                    current = currentKeyboardHeight,
+                    optionLabel = { "$it" },
+                    onSelect = {
+                        viewModel.setKeyboardHeight(it)
+                        showKeyboardHeightDialog = false
+                    },
+                    onDismiss = { showKeyboardHeightDialog = false }
+                )
+            }
+
+            if (showCandidateHeightDialog) {
+                SettingsSelectionDialog(
+                    title = "Candidate Height",
+                    options = CandidateHeight.entries,
+                    current = currentCandidateHeight,
+                    optionLabel = { "$it" },
+                    onSelect = {
+                        viewModel.setCandidateHeight(it)
+                        showCandidateHeightDialog = false
+                    },
+                    onDismiss = { showCandidateHeightDialog = false }
+                )
+            }
+
+            if (showThemeDialog) {
+                SettingsSelectionDialog(
+                    title = "Theme Color",
+                    options = ThemeColor.entries,
+                    current = themeColor,
+                    optionLabel = { it.name },
+                    onSelect = {
+                        viewModel.setThemeColor(it)
+                        showThemeDialog = false
+                    },
+                    onDismiss = { showThemeDialog = false }
+                )
+            }
+
+            if (showKeyboardBackgroundDialog) {
+                SettingImageSelectionDialog(
+                    title = "Background Image",
+                    options = BackgroundImage.availableEntries(),
+                    current = backgroundImage,
+                    onSelect = {
+                        viewModel.setKeyboardBackgroundImage(it)
+                        showKeyboardBackgroundDialog = false
+                    },
+                    onDismiss = { showKeyboardBackgroundDialog = false }
+                )
+            }
+
+            if (showFontDialog) {
+                SettingsSelectionDialog(
+                    title = "Font",
+                    options = FontType.entries,
+                    current = fontType,
+                    optionLabel = { it.label },
+                    onSelect = {
+                        viewModel.setFontType(it)
+                        showFontDialog = false
+                    },
+                    onDismiss = { showFontDialog = false }
+                )
+            }
+        }
+    }
+}

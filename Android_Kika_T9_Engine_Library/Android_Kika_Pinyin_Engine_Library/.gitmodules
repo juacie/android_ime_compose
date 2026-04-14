@@ -1,0 +1,4 @@
+[submodule "kika-pinyin-engine-library/src/main/jni/src"]
+	path = kika-pinyin-engine-library/src/main/jni/src
+	url = git@github.com:KikaTech/Android_Kika_Pinyin_Engine_Library.git
+	branch = zhuyin_v1.2_engine_source
